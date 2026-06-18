@@ -159,6 +159,8 @@ const db = getFirestore(app);
 
 window._fbDb = db;
 window._fbFns = { doc, setDoc, getDoc, onSnapshot };
+window._fbReady = true;
+window.dispatchEvent(new Event('fbReady'));
 </script>
 </head>
 <body>
@@ -529,14 +531,18 @@ function startApp(){
   setTimeout(async()=>{
     if(familyCode){
       try{
+        // Firebase 완전히 준비될 때까지 대기
+        if(!window._fbReady){
+          await new Promise(r=>window.addEventListener('fbReady',r,{once:true}));
+        }
         await loadFromCloud();
         // 본인 이름 members에 추가
         if(userName&&!familyMembers.includes(userName)){
           familyMembers.push(userName);
           await syncToCloud();
         }
-        setTimeout(()=>startRealtimeSync(),100);
-      }catch(e){}
+        startRealtimeSync();
+      }catch(e){console.log('init sync error',e);}
     }
     // 스플래시 제거
     splash.remove();
@@ -737,12 +743,25 @@ async function doDelCatHome(id){
   const ok=await showConfirm('카테고리 삭제',`'${c.name}' 카테고리를 삭제할까요?`);
   if(ok){cats=cats.filter(x=>x.id!==id);save();renderHome();toast('삭제됐어요');}
 }
-function changeName(){
+async function changeName(){
   const n=document.getElementById('set-name-inp').value.trim();
   if(!n){toast('이름을 입력해주세요');return;}
-  userName=n;save();
+  const oldName=userName;
+  userName=n;
+  S.set('fk_user',userName);
+  // members에서 이전 이름 → 새 이름으로 교체
+  if(familyCode){
+    if(oldName&&familyMembers.includes(oldName)){
+      familyMembers=familyMembers.map(m=>m===oldName?n:m);
+    } else if(!familyMembers.includes(n)){
+      familyMembers.push(n);
+    }
+    await syncToCloud();
+  }
+  save();
   document.getElementById('set-name-v').textContent=userName;
   document.getElementById('set-name-inp').value='';
+  renderSettings();
   toast(`이름이 '${userName}'으로 변경됐어요!`);
 }
 </script>
