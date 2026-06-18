@@ -146,7 +146,7 @@ input[type=date]{-webkit-appearance:none;appearance:none}
 <div id="app">
 
 <!-- Splash -->
-<div id="s-splash" style="display:flex;flex:1;flex-direction:column;background:#1a1a2e;justify-content:center;align-items:center;flex-direction:column;gap:16px">
+<div id="s-splash" style="position:fixed;inset:0;background:#1a1a2e;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;z-index:999">
   <div style="width:96px;height:96px;border-radius:30px;background:#E1F5EE;display:flex;align-items:center;justify-content:center;font-size:52px">❄️</div>
   <div style="font-size:26px;font-weight:700;color:#fff">냉장고 지킴이</div>
   <div style="font-size:14px;color:#9FE1CB">식품 유통기한 관리 앱</div>
@@ -476,13 +476,19 @@ function startApp(){
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
   setTimeout(async()=>{
     const splash=document.getElementById('s-splash');
-    splash.style.transition='opacity 0.4s';
     splash.style.opacity='0';
-    setTimeout(()=>{splash.style.display='none';},400);
+    splash.style.transition='opacity 0.3s';
+    setTimeout(()=>{ splash.style.display='none'; }, 300);
     if(familyCode&&binId){try{await loadFromCloud();}catch(e){}}
-    if(userName){screenStack.push('home');showScreen('home');renderHome();history.pushState({screen:'home'},'',location.pathname);}
-    else{showScreen('ob');}
-  },1500);
+    if(userName){
+      screenStack.push('home');
+      showScreen('home');
+      renderHome();
+      history.pushState({screen:'home'},'',location.pathname);
+    } else {
+      showScreen('ob');
+    }
+  }, 1800);
 })();
 
 function renderHome(){
