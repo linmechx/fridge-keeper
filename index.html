@@ -474,9 +474,14 @@ function startApp(){
 
 (function init(){
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
-  setTimeout(()=>{
+  setTimeout(async()=>{
+    const splash=document.getElementById('s-splash');
+    splash.style.transition='opacity 0.4s';
+    splash.style.opacity='0';
+    setTimeout(()=>{splash.style.display='none';},400);
+    if(familyCode&&binId){try{await loadFromCloud();}catch(e){}}
     if(userName){screenStack.push('home');showScreen('home');renderHome();history.pushState({screen:'home'},'',location.pathname);}
-    else showScreen('ob');
+    else{showScreen('ob');}
   },1500);
 })();
 
