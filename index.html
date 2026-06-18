@@ -446,15 +446,22 @@ async function joinFamily(code){
   familyCode=code;
   S.set('fk_family',familyCode);
   const loaded=await loadFromCloud();
-  if(!loaded)await syncToCloud();
+  // 본인 이름 members에 추가
+  if(userName&&!familyMembers.includes(userName)) familyMembers.push(userName);
+  await syncToCloud();
   startRealtimeSync();
   renderHome();renderSettings();
   toast(loaded?`가족 공유 연결됐어요! (${code})`:`새 가족 공유 코드 '${code}' 생성됐어요!`);
 }
 
-function leaveFamily(){
+async function leaveFamily(){
   if(unsubscribe){unsubscribe();unsubscribe=null;}
-  familyCode='';
+  // members에서 본인 제거
+  if(userName&&familyMembers.includes(userName)){
+    familyMembers=familyMembers.filter(m=>m!==userName);
+    await syncToCloud();
+  }
+  familyCode='';familyMembers=[];
   S.set('fk_family','');
   renderSettings();toast('가족 공유가 해제됐어요');
 }
@@ -523,6 +530,11 @@ function startApp(){
     if(familyCode){
       try{
         await loadFromCloud();
+        // 본인 이름 members에 추가
+        if(userName&&!familyMembers.includes(userName)){
+          familyMembers.push(userName);
+          await syncToCloud();
+        }
         setTimeout(()=>startRealtimeSync(),100);
       }catch(e){}
     }
