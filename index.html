@@ -145,15 +145,8 @@ input[type=date]{-webkit-appearance:none;appearance:none}
 <body>
 <div id="app">
 
-<!-- Splash -->
-<div id="s-splash" style="position:fixed;inset:0;background:#1a1a2e;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;z-index:999">
-  <div style="width:96px;height:96px;border-radius:30px;background:#E1F5EE;display:flex;align-items:center;justify-content:center;font-size:52px">❄️</div>
-  <div style="font-size:26px;font-weight:700;color:#fff">냉장고 지킴이</div>
-  <div style="font-size:14px;color:#9FE1CB">식품 유통기한 관리 앱</div>
-</div>
-
 <!-- Onboarding -->
-<div id="s-ob" class="screen" style="display:none">
+<div id="s-ob" class="screen">
   <div class="status-pad"></div>
   <div class="ob-icon">❄️</div>
   <div class="ob-h">냉장고 지킴이</div>
@@ -474,12 +467,17 @@ function startApp(){
 
 (function init(){
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+  // 스플래시 동적 생성
+  const splash = document.createElement('div');
+  splash.style.cssText = 'position:fixed;inset:0;background:#1a1a2e;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;z-index:9999';
+  splash.innerHTML = '<div style="width:96px;height:96px;border-radius:30px;background:#E1F5EE;display:flex;align-items:center;justify-content:center;font-size:52px">❄️</div><div style="font-size:26px;font-weight:700;color:#fff">냉장고 지킴이</div><div style="font-size:14px;color:#9FE1CB">식품 유통기한 관리 앱</div>';
+  document.body.appendChild(splash);
+
   setTimeout(async()=>{
-    const splash=document.getElementById('s-splash');
-    splash.style.opacity='0';
-    splash.style.transition='opacity 0.3s';
-    setTimeout(()=>{ splash.style.display='none'; }, 300);
     if(familyCode&&binId){try{await loadFromCloud();}catch(e){}}
+    // 스플래시 제거
+    splash.remove();
+    // 다음 화면으로
     if(userName){
       screenStack.push('home');
       showScreen('home');
@@ -488,7 +486,7 @@ function startApp(){
     } else {
       showScreen('ob');
     }
-  }, 1800);
+  }, 1500);
 })();
 
 function renderHome(){
