@@ -332,9 +332,9 @@ const CAT_COLORS=['#E6F1FB','#EAF3DE','#FAEEDA','#FAECE7','#E1F5EE','#EEEDFE','#
 const QUOTES=['오늘도 냉장고를 깔끔하게! 🧹','신선함을 지키는 작은 습관 ✨','유통기한 관리, 오늘도 완벽해요 👍','버리는 음식 없는 하루를 만들어요 🌿','냉장고가 깨끗하면 기분도 상쾌해요','엄마에게 바치는 앱 🫶','오늘 뭐 먹을지 고민 중인가요? 😄'];
 const SORTS=[{k:'expiry',lbl:'만료 임박순'},{k:'name',lbl:'가나다순'},{k:'custom',lbl:'직접 정렬'},{k:'reg',lbl:'등록순'}];
 
-let userName='',prevS='home',selFoodE='🍎',isFavCheck=false,curSort='expiry',dialogResolve=null,customOrder=S.get('fk_order')||[];
-const today=()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate());};
 const S={get:(k)=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
+const today=()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate());};
+let userName='',prevS='home',selFoodE='🍎',isFavCheck=false,curSort='expiry',dialogResolve=null,customOrder=S.get('fk_order')||[];
 
 let foods=S.get('fk_foods')||[];
 let cats=S.get('fk_cats')||[
