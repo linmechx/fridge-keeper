@@ -332,6 +332,22 @@ window.dispatchEvent(new Event('fbReady'));
   </nav>
 </div>
 
+<!-- Category Sheet -->
+<div class="sheet-backdrop" id="cat-sheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="cat-sheet-title">카테고리 추가</div>
+    <label class="flbl">이름</label>
+    <input class="finp" id="cs-name" placeholder="카테고리 이름" style="margin-bottom:14px">
+    <label class="flbl">아이콘 선택</label>
+    <div class="ep-grid" id="cat-ep" style="grid-template-columns:repeat(5,1fr)"></div>
+    <div class="sheet-btns">
+      <button class="shb shb-cancel" onclick="closeCatSheet()">취소</button>
+      <button class="shb shb-save" id="cs-save-btn" onclick="saveCat()">추가</button>
+    </div>
+  </div>
+</div>
+
 <!-- Confirm Dialog -->
 <div class="dialog-backdrop" id="dialog">
   <div class="dialog">
@@ -345,6 +361,11 @@ window.dispatchEvent(new Event('fbReady'));
 </div>
 
 <div class="toast" id="toast"></div>
+<script>
+document.getElementById('cat-sheet').addEventListener('click',function(e){
+  if(e.target===this) closeCatSheet();
+});
+</script>
 
 <script>
 // 아이콘: 겹치지 않고 평범한 것들로 구성
@@ -735,12 +756,55 @@ function moveFood(id,dir){
   customOrder.splice(newIdx,0,id);
   save();renderList();
 }
+
+// ===== 카테고리 시트 =====
+const CAT_E_LIST=['📦','🥛','🥬','🍎','🥩','🐟','🧃','🍪','🧂','🧊','🫙','🥚','🍗','🧀','🌶️','🥦','🍋','🍇','🍌','🥤'];
+const CAT_COLORS_LIST=['#E6F1FB','#EAF3DE','#FAEEDA','#FAECE7','#E1F5EE','#EEEDFE','#FBEAF0','#F1EFE8'];
+let editCatId=null;
+let selCatE='📦';
+
+function openCatSheet(id){
+  editCatId=id;
+  const c=id?cats.find(x=>x.id===id):null;
+  selCatE=c?c.icon:'📦';
+  document.getElementById('cat-sheet-title').textContent=c?'카테고리 수정':'카테고리 추가';
+  document.getElementById('cs-save-btn').textContent=c?'저장':'추가';
+  document.getElementById('cs-name').value=c?c.name:'';
+  document.getElementById('cat-ep').innerHTML=CAT_E_LIST.map(e=>`<button class="ep-btn${e===selCatE?' sel':''}" onclick="pickCatE('${e}')">${e}</button>`).join('');
+  document.getElementById('cat-sheet').classList.add('open');
+}
+
+function closeCatSheet(){
+  document.getElementById('cat-sheet').classList.remove('open');
+}
+
+function pickCatE(e){
+  selCatE=e;
+  document.querySelectorAll('#cat-ep .ep-btn').forEach(b=>b.classList.toggle('sel',b.textContent===e));
+}
+
+function saveCat(){
+  const name=document.getElementById('cs-name').value.trim();
+  if(!name){toast('카테고리 이름을 입력해주세요');return;}
+  if(editCatId){
+    const c=cats.find(x=>x.id===editCatId);
+    if(c){c.name=name;c.icon=selCatE;}
+  } else {
+    cats.push({id:uid(),name,icon:selCatE,color:CAT_COLORS_LIST[cats.length%CAT_COLORS_LIST.length]});
+  }
+  save();
+  closeCatSheet();
+  renderHome();
+  toast(editCatId?'수정됐어요!':'카테고리가 추가됐어요!');
+}
+
 async function doDelCatHome(id){
   const c=cats.find(x=>x.id===id);if(!c)return;
   if(foods.some(f=>f.catId===id)){toast(`'${c.name}'에 식품이 있어서 삭제할 수 없어요`);return;}
   const ok=await showConfirm('카테고리 삭제',`'${c.name}' 카테고리를 삭제할까요?`);
   if(ok){cats=cats.filter(x=>x.id!==id);save();renderHome();toast('삭제됐어요');}
 }
+
 async function changeName(){
   const n=document.getElementById('set-name-inp').value.trim();
   if(!n){toast('이름을 입력해주세요');return;}
