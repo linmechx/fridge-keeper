@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="냉장고 지킴이">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>냉장고 지킴이</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+  :root{
+    --primary:#1D9E75;--primary-dark:#0F6E56;--dark:#1a1a2e;
+    --bg:#f7f8fa;--card:#fff;--border:#E5E7EB;
+    --txt1:#1a1a2e;--txt2:#6B7280;--txt3:#9CA3AF;
+    --exp:#E24B4A;--warn:#EF9F27;
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-bot:env(safe-area-inset-bottom,0px);
+  }
+  html,body{height:100%;overflow:hidden;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+  #app{height:100%;display:flex;flex-direction:column;max-width:430px;margin:0 auto;position:relative}
+
+  /* screens */
+  .screen{display:none;flex-direction:column;flex:1;overflow:hidden;background:var(--bg)}
+  .screen.active{display:flex}
+  .scroll-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px calc(16px + var(--safe-bot))}
+
+  /* status bar spacer */
+  .status-pad{height:var(--safe-top);background:inherit}
+
+  /* topbar */
+  .topbar{background:var(--card);border-bottom:0.5px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+  .topbar-title{font-size:17px;font-weight:600;color:var(--txt1)}
+  .back-btn{display:flex;align-items:center;gap:4px;font-size:14px;color:var(--primary);background:none;border:none;cursor:pointer;padding:4px 0}
+  .icon-btn{width:36px;height:36px;border-radius:50%;background:#f3f4f6;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--txt2)}
+
+  /* bottom nav */
+  .bnav{background:var(--card);border-top:0.5px solid var(--border);display:flex;padding:8px 0;padding-bottom:calc(8px + var(--safe-bot));flex-shrink:0}
+  .nb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px;border:none;background:none;cursor:pointer;font-size:10px;color:var(--txt3);font-family:inherit}
+  .nb svg{width:24px;height:24px}
+  .nb.act{color:var(--primary)}
+
+  /* onboarding */
+  #s-ob{background:#fff;justify-content:center;align-items:center;padding:32px 28px}
+  .ob-icon{width:80px;height:80px;border-radius:26px;background:#E1F5EE;display:flex;align-items:center;justify-content:center;font-size:42px;margin-bottom:24px}
+  .ob-h{font-size:26px;font-weight:700;color:var(--txt1);margin-bottom:10px;text-align:center}
+  .ob-p{font-size:15px;color:var(--txt2);text-align:center;line-height:1.7;margin-bottom:36px}
+
+  /* cards */
+  .card{background:var(--card);border-radius:16px;border:0.5px solid var(--border);padding:16px;margin-bottom:12px}
+
+  /* hero */
+  .hero{background:var(--dark);border-radius:20px;padding:20px;margin-bottom:20px;color:#fff}
+  .hero-name{font-size:20px;font-weight:600;margin-bottom:5px}
+  .hero-q{font-size:13px;color:#9FE1CB;line-height:1.6;margin-bottom:16px}
+  .hero-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .hstat{background:rgba(255,255,255,0.1);border-radius:12px;padding:12px}
+  .hstat-n{font-size:22px;font-weight:700;color:#fff}
+  .hstat-l{font-size:11px;color:#9FE1CB;margin-top:2px}
+
+  /* section */
+  .sec-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .sec-lbl{font-size:12px;font-weight:600;color:var(--txt2);letter-spacing:0.4px}
+  .sec-acts{display:flex;gap:6px}
+  .sm-btn{font-size:11px;color:var(--txt2);background:#f3f4f6;border:0.5px solid var(--border);border-radius:8px;padding:4px 10px;cursor:pointer;font-family:inherit}
+
+  /* expiry chip */
+  .chip{display:inline-block;font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px}
+  .chip-ok{background:#EAF3DE;color:#3B6D11}
+  .chip-warn{background:#FAEEDA;color:#854F0B}
+  .chip-exp{background:#FCEBEB;color:#A32D2D}
+  .chip-cat{background:#f3f4f6;color:var(--txt2)}
+
+  /* food rows */
+  .food-row{background:var(--card);border-radius:14px;border:0.5px solid var(--border);padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+  .food-row.warn{border-left:3px solid var(--warn);border-radius:0 14px 14px 0}
+  .food-row.danger{border-left:3px solid var(--exp);border-radius:0 14px 14px 0}
+  .cicon{border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+  .food-info{flex:1;min-width:0}
+  .food-name{font-size:14px;font-weight:600;color:var(--txt1)}
+  .food-meta{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;align-items:center}
+  .food-memo{font-size:11px;color:var(--txt3);margin-top:3px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row-btn{width:30px;height:30px;border-radius:8px;border:0.5px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--txt3)}
+  .row-btn.fav-on{color:#EF9F27;border-color:#EF9F27;background:#FAEEDA}
+  .row-btn.del:active{background:#FCEBEB;color:#A32D2D}
+
+  /* fav scroll */
+  .fav-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:20px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .fav-scroll::-webkit-scrollbar{display:none}
+  .fav-chip{background:var(--card);border:0.5px solid var(--border);border-radius:14px;padding:10px 10px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;min-width:70px}
+  .fav-chip-icon{font-size:24px}
+  .fav-chip-name{font-size:11px;color:var(--txt2);white-space:nowrap;max-width:64px;overflow:hidden;text-overflow:ellipsis}
+
+  /* cat grid */
+  .cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+  .cat-tile{background:var(--card);border-radius:14px;border:0.5px solid var(--border);padding:12px;display:flex;align-items:center;gap:10px}
+
+  /* search */
+  .search-wrap{background:#f3f4f6;border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:8px;margin-bottom:14px}
+  .search-wrap svg{flex-shrink:0;color:var(--txt3)}
+  .search-wrap input{flex:1;border:none;background:transparent;font-size:14px;color:var(--txt1);outline:none;font-family:inherit}
+
+  /* forms */
+  .flbl{font-size:12px;color:var(--txt2);font-weight:500;margin-bottom:6px;display:block}
+  .finp{width:100%;padding:11px 14px;border-radius:12px;border:1px solid var(--border);font-size:14px;background:#fff;color:var(--txt1);font-family:inherit;outline:none;-webkit-appearance:none}
+  .finp:focus{border-color:var(--primary)}
+  .fgap{margin-top:12px}
+  .ep-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px}
+  .ep-btn{height:42px;border-radius:10px;border:1.5px solid var(--border);background:#f3f4f6;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .ep-btn.sel{border-color:var(--primary);background:#E1F5EE}
+  .date-btn{width:100%;padding:11px 14px;border-radius:12px;border:1px solid var(--border);font-size:14px;background:#fff;color:var(--txt1);font-family:inherit;cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px;-webkit-appearance:none}
+  .date-btn.empty{color:var(--txt3)}
+  .fav-check-row{display:flex;align-items:center;gap:10px;cursor:pointer}
+  .fav-check-box{width:22px;height:22px;border-radius:6px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px}
+  .fav-check-box.on{background:var(--primary);border-color:var(--primary);color:#fff}
+
+  /* big buttons */
+  .big-btn{width:100%;padding:14px;background:var(--primary);color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:4px}
+  .big-btn:active{background:var(--primary-dark)}
+  .out-btn{width:100%;padding:14px;background:#fff;color:var(--primary);border:1.5px solid var(--primary);border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px}
+
+  /* buy list */
+  .buy-row{background:var(--card);border-radius:14px;border:0.5px solid var(--border);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+  .buy-check{width:24px;height:24px;border-radius:6px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;font-size:14px}
+  .buy-check.on{background:var(--primary);border-color:var(--primary);color:#fff}
+  .buy-name{flex:1;font-size:14px;color:var(--txt1)}
+  .buy-name.done{text-decoration:line-through;color:var(--txt3)}
+  .buy-input-row{display:flex;gap:8px;padding:12px 16px;padding-bottom:calc(12px + var(--safe-bot));background:var(--card);border-top:0.5px solid var(--border);flex-shrink:0}
+  .buy-input-row input{flex:1;padding:11px 14px;border-radius:12px;border:1px solid var(--border);font-size:14px;background:#f3f4f6;color:var(--txt1);font-family:inherit;outline:none}
+  .buy-input-row input:focus{background:#fff;border-color:var(--primary)}
+  .buy-add-btn{width:48px;height:48px;border-radius:12px;background:var(--primary);color:#fff;border:none;font-size:22px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+
+  /* settings */
+  .set-section{background:var(--card);border-radius:16px;border:0.5px solid var(--border);overflow:hidden;margin-bottom:12px}
+  .set-row{display:flex;align-items:center;justify-content:space-between;padding:14px 16px}
+  .set-row+.set-row{border-top:0.5px solid var(--border)}
+  .set-lbl{font-size:14px;color:var(--txt1)}
+  .set-val{font-size:13px;color:var(--txt2)}
+  .set-name-edit{display:flex;gap:8px;padding:0 16px 14px}
+  .set-name-edit input{flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--border);font-size:14px;background:#fff;color:var(--txt1);font-family:inherit;outline:none}
+  .set-name-edit input:focus{border-color:var(--primary)}
+  .set-name-edit button{padding:0 16px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:inherit}
+  .cat-row{display:flex;align-items:center;gap:10px;padding:12px 16px}
+  .cat-row+.cat-row{border-top:0.5px solid var(--border)}
+  .cat-row-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+
+  /* modal bottom sheet */
+  .sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;display:none;align-items:flex-end;justify-content:center}
+  .sheet-backdrop.open{display:flex}
+  .sheet{background:#fff;border-radius:20px 20px 0 0;padding:20px 16px;width:100%;max-width:430px;padding-bottom:calc(20px + var(--safe-bot));max-height:90vh;overflow-y:auto}
+  .sheet-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
+  .sheet-title{font-size:16px;font-weight:600;color:var(--txt1);margin-bottom:16px}
+  .sheet-btns{display:flex;gap:8px;margin-top:16px}
+  .shb{flex:1;padding:12px;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit;border:none}
+  .shb-cancel{background:#f3f4f6;color:var(--txt2)}
+  .shb-save{background:var(--primary);color:#fff;font-weight:600}
+
+  /* toast */
+  .toast{position:fixed;bottom:calc(80px + var(--safe-bot));left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 20px;border-radius:100px;font-size:13px;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;z-index:200}
+  .toast.show{opacity:1}
+
+  /* confirm dialog */
+  .dialog-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+  .dialog-backdrop.open{display:flex}
+  .dialog{background:#fff;border-radius:16px;padding:20px;width:100%;max-width:320px}
+  .dialog-title{font-size:16px;font-weight:600;color:var(--txt1);margin-bottom:8px}
+  .dialog-msg{font-size:14px;color:var(--txt2);line-height:1.6;margin-bottom:20px}
+  .dialog-btns{display:flex;gap:8px}
+  .dialog-btns button{flex:1;padding:11px;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;border:none;font-weight:500}
+  .dbtn-cancel{background:#f3f4f6;color:var(--txt2)}
+  .dbtn-ok{background:#FCEBEB;color:#A32D2D}
+
+  /* progress ring */
+  .prog-ring{width:44px;height:44px;position:relative}
+  .prog-ring svg{transform:rotate(-90deg)}
+  .prog-ring-lbl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--txt1)}
+
+  /* empty state */
+  .empty{text-align:center;padding:48px 16px;color:var(--txt3)}
+  .empty-icon{font-size:40px;margin-bottom:12px}
+  .empty-txt{font-size:14px}
+
+  /* date input workaround */
+  input[type=date]{-webkit-appearance:none;appearance:none}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- Splash -->
+<div id="s-splash" class="screen active" style="display:flex;background:#1a1a2e;justify-content:center;align-items:center;flex-direction:column;gap:16px">
+  <div style="width:88px;height:88px;border-radius:28px;background:#E1F5EE;display:flex;align-items:center;justify-content:center;font-size:46px">❄️</div>
+  <div style="font-size:24px;font-weight:700;color:#fff">냉장고 지킴이</div>
+  <div style="font-size:13px;color:#9FE1CB">식품 유통기한 관리 앱</div>
+</div>
+
+<!-- Onboarding -->
+<div id="s-ob" class="screen" style="display:none">
+  <div class="status-pad"></div>
+  <div class="ob-icon">❄️</div>
+  <div class="ob-h">냉장고 지킴이</div>
+  <div class="ob-p">이름을 알려주시면<br>맞춤으로 관리해드릴게요</div>
+  <input class="finp" id="ob-name" placeholder="이름을 입력하세요" maxlength="8" style="margin-bottom:14px">
+  <button class="big-btn" onclick="startApp()" style="margin-top:0">시작하기</button>
+</div>
+
+<!-- Home -->
+<div id="s-home" class="screen">
+  <div class="status-pad" style="background:var(--dark)"></div>
+  <div class="scroll-body" id="home-body"></div>
+  <nav class="bnav" id="nav-home">
+    <button class="nb act" onclick="go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>홈</button>
+    <button class="nb" onclick="go('list')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>식품</button>
+    <button class="nb" onclick="go('buy')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 001.99 1.61h9.72a2 2 0 001.99-1.61L23 6H6"/></svg>구매</button>
+    <button class="nb" onclick="go('add')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>추가</button>
+    <button class="nb" onclick="go('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>설정</button>
+  </nav>
+</div>
+
+<!-- Food List -->
+<div id="s-list" class="screen">
+  <div class="status-pad"></div>
+  <div class="topbar">
+    <span class="topbar-title">전체 식품</span>
+    <button class="icon-btn" onclick="go('add')" aria-label="추가">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+  </div>
+  <div style="padding:12px 16px 0;flex-shrink:0">
+    <div class="search-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="srch-inp" placeholder="식품명으로 검색..." oninput="renderList()">
+    </div>
+  </div>
+  <div class="scroll-body" style="padding-top:0" id="list-body"></div>
+  <nav class="bnav">
+    <button class="nb" onclick="go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>홈</button>
+    <button class="nb act" onclick="go('list')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>식품</button>
+    <button class="nb" onclick="go('buy')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 001.99 1.61h9.72a2 2 0 001.99-1.61L23 6H6"/></svg>구매</button>
+    <button class="nb" onclick="go('add')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>추가</button>
+    <button class="nb" onclick="go('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>설정</button>
+  </nav>
+</div>
+
+<!-- Buy List -->
+<div id="s-buy" class="screen">
+  <div class="status-pad"></div>
+  <div class="topbar">
+    <span class="topbar-title">구매 예정</span>
+    <button id="clear-done-btn" class="sm-btn" style="color:#A32D2D;background:#FCEBEB;border-color:#F09595;display:none" onclick="clearDone()">완료 삭제</button>
+  </div>
+  <div class="scroll-body" id="buy-body"></div>
+  <div class="buy-input-row">
+    <input type="text" id="buy-inp" placeholder="구매할 항목 입력..." onkeydown="if(event.key==='Enter')addBuy()">
+    <button class="buy-add-btn" onclick="addBuy()">+</button>
+  </div>
+</div>
+
+<!-- Add Food -->
+<div id="s-add" class="screen">
+  <div class="status-pad"></div>
+  <div class="topbar">
+    <button class="back-btn" onclick="goBack()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>뒤로
+    </button>
+    <span class="topbar-title">식품 추가</span>
+    <div style="width:60px"></div>
+  </div>
+  <div class="scroll-body">
+    <div class="card">
+      <label class="flbl">식품명 *</label>
+      <input class="finp" id="f-name" placeholder="예: 우유, 계란...">
+      <div class="fgap"></div>
+      <label class="flbl">아이콘 선택</label>
+      <div class="ep-grid" id="food-ep"></div>
+    </div>
+    <div class="card">
+      <label class="flbl">카테고리 *</label>
+      <select class="finp" id="f-cat" style="-webkit-appearance:none"></select>
+    </div>
+    <div class="card">
+      <label class="flbl">유통기한 *</label>
+      <button class="date-btn empty" id="f-date-btn" onclick="openDatePicker()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span id="f-date-lbl">날짜를 선택하세요</span>
+      </button>
+      <input type="date" id="f-date" style="position:absolute;opacity:0;pointer-events:none" onchange="onDateChange()">
+      <div class="fgap"></div>
+      <label class="flbl">수량</label>
+      <input class="finp" type="number" id="f-qty" placeholder="개수 입력" min="0">
+      <div class="fgap"></div>
+      <div class="fav-check-row" onclick="toggleFavCheck()">
+        <div class="fav-check-box" id="fav-check-box"></div>
+        <span style="font-size:14px;color:var(--txt1)">즐겨찾기에 추가</span>
+      </div>
+    </div>
+    <div class="card">
+      <label class="flbl">메모</label>
+      <textarea class="finp" id="f-memo" placeholder="보관 방법, 구매처 등" style="min-height:72px;resize:none"></textarea>
+    </div>
+    <button class="big-btn" onclick="saveFood()">저장하기</button>
+    <div style="height:40px"></div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div id="s-settings" class="screen">
+  <div class="status-pad"></div>
+  <div class="topbar"><span class="topbar-title">설정</span><div style="width:36px"></div></div>
+  <div class="scroll-body">
+    <div class="sec-lbl" style="margin-bottom:8px">내 정보</div>
+    <div class="set-section">
+      <div class="set-row"><span class="set-lbl">이름</span><span class="set-val" id="set-name-v"></span></div>
+      <div class="set-name-edit">
+        <input type="text" id="set-name-inp" placeholder="새 이름 입력" maxlength="8">
+        <button onclick="changeName()">변경</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:8px">
+      <span class="sec-lbl">카테고리 관리</span>
+      <button class="sm-btn" style="background:var(--primary);color:#fff;border-color:var(--primary)" onclick="openCatSheet(null)">+ 추가</button>
+    </div>
+    <div class="set-section" id="cat-list"></div>
+    <div style="margin-top:16px;margin-bottom:8px" class="sec-lbl">앱 정보</div>
+    <div class="set-section">
+      <div class="set-row"><span class="set-lbl">버전</span><span class="set-val">1.0.0</span></div>
+      <div class="set-row" style="border-top:0.5px solid var(--border)"><span class="set-lbl">등록 식품</span><span class="set-val" id="info-food-cnt"></span></div>
+      <div class="set-row" style="border-top:0.5px solid var(--border)"><span class="set-lbl">카테고리</span><span class="set-val" id="info-cat-cnt"></span></div>
+    </div>
+    <div style="height:40px"></div>
+  </div>
+  <nav class="bnav">
+    <button class="nb" onclick="go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>홈</button>
+    <button class="nb" onclick="go('list')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>식품</button>
+    <button class="nb" onclick="go('buy')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 001.99 1.61h9.72a2 2 0 001.99-1.61L23 6H6"/></svg>구매</button>
+    <button class="nb" onclick="go('add')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>추가</button>
+    <button class="nb act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>설정</button>
+  </nav>
+</div>
+
+<!-- Category Sheet -->
+<div class="sheet-backdrop" id="cat-sheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="cat-sheet-title">카테고리 추가</div>
+    <label class="flbl">이름</label>
+    <input class="finp" id="cs-name" placeholder="카테고리 이름" style="margin-bottom:14px">
+    <label class="flbl">아이콘 선택</label>
+    <div class="ep-grid" id="cat-ep"></div>
+    <div class="sheet-btns">
+      <button class="shb shb-cancel" onclick="closeCatSheet()">취소</button>
+      <button class="shb shb-save" onclick="saveCat()" id="cs-save-btn">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="dialog-backdrop" id="dialog">
+  <div class="dialog">
+    <div class="dialog-title" id="dlg-title"></div>
+    <div class="dialog-msg" id="dlg-msg"></div>
+    <div class="dialog-btns">
+      <button class="dbtn-cancel" onclick="closeDialog(false)">취소</button>
+      <button class="dbtn-ok" id="dlg-ok" onclick="closeDialog(true)">삭제</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const FOOD_E=['📦','🥛','🧀','🥚','🥩','🐟','🍗','🥬','🥦','🍅','🥕','🍎','🍊','🍇','🍋','🍌','🧃','🥤','🍪','🍫','🧂','🫙','🧊','🌶️','🧄','🧅','🍞','🥐','🫐','🍺'];
+const CAT_E=['📦','🥛','🥬','🍎','🥩','🐟','🧃','🍪','🧂','🧊','🫙','🥚','🍗','🧀','🌶️','🥦','🍋','🍇','🍌','🥤'];
+const CAT_COLORS=['#E6F1FB','#EAF3DE','#FAEEDA','#FAECE7','#E1F5EE','#EEEDFE','#FBEAF0','#F1EFE8'];
+const QUOTES=['오늘도 냉장고를 깔끔하게! 🧹','신선함을 지키는 작은 습관 ✨','유통기한 관리, 오늘도 완벽해요 👍','버리는 음식 없는 하루를 만들어요 🌿','냉장고가 깨끗하면 기분도 상쾌해요','엄마에게 바치는 앱 🫶','오늘 뭐 먹을지 고민 중인가요? 😄'];
+
+// State
+let userName='', prevS='home', selFoodE='📦', selCatE='📦', editCatId=null, isFavCheck=false;
+let dialogResolve=null;
+const today=()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate());};
+
+// Storage helpers
+const S={
+  get:(k)=>{try{return JSON.parse(localStorage.getItem(k));}catch{return null;}},
+  set:(k,v)=>localStorage.setItem(k,JSON.stringify(v)),
+};
+
+// Data
+let foods=S.get('fk_foods')||[];
+let cats=S.get('fk_cats')||[
+  {id:'c1',name:'유제품',icon:'🥛',color:'#E6F1FB'},
+  {id:'c2',name:'채소',icon:'🥬',color:'#EAF3DE'},
+  {id:'c3',name:'과일',icon:'🍎',color:'#FAEEDA'},
+  {id:'c4',name:'육류',icon:'🥩',color:'#FAECE7'},
+  {id:'c5',name:'해산물',icon:'🐟',color:'#E1F5EE'},
+  {id:'c6',name:'음료',icon:'🧃',color:'#EEEDFE'},
+  {id:'c7',name:'냉동식품',icon:'🧊',color:'#E6F1FB'},
+  {id:'c8',name:'기타',icon:'📦',color:'#F1EFE8'},
+];
+let buyItems=S.get('fk_buy')||[];
+userName=S.get('fk_user')||'';
+
+function save(){S.set('fk_foods',foods);S.set('fk_cats',cats);S.set('fk_buy',buyItems);S.set('fk_user',userName);}
+
+// Utils
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function daysLeft(dateStr){const d=new Date(dateStr),t=today();return Math.ceil((d-t)/86400000);}
+function dayLabel(n){if(n<0)return Math.abs(n)+'일 초과';if(n===0)return '오늘 만료';return n+'일 남음';}
+function chipCls(n){if(n<0)return 'chip chip-exp';if(n<=3)return 'chip chip-warn';return 'chip chip-ok';}
+function cardBorder(n){if(n<0)return 'danger';if(n<=3)return 'warn';return '';}
+function catBy(id){return cats.find(c=>c.id===id)||{name:'기타',icon:'📦',color:'#F1EFE8'};}
+
+// Toast
+let toastTimer;
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2000);
+}
+
+// Dialog
+function confirm(title,msg,okTxt='삭제'){
+  return new Promise(res=>{
+    dialogResolve=res;
+    document.getElementById('dlg-title').textContent=title;
+    document.getElementById('dlg-msg').textContent=msg;
+    document.getElementById('dlg-ok').textContent=okTxt;
+    document.getElementById('dialog').classList.add('open');
+  });
+}
+function closeDialog(ok){
+  document.getElementById('dialog').classList.remove('open');
+  if(dialogResolve){dialogResolve(ok);dialogResolve=null;}
+}
+
+// Navigation
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active');s.style.display='none';});
+  const t=document.getElementById('s-'+id);
+  t.style.display='flex';
+  t.classList.add('active');
+}
+function go(s){
+  if(!['add','catsheet'].includes(s)) prevS=s;
+  if(s==='home') renderHome();
+  else if(s==='list'){document.getElementById('srch-inp').value='';renderList();}
+  else if(s==='buy') renderBuy();
+  else if(s==='add') initAdd();
+  else if(s==='settings') renderSettings();
+  showScreen(s);
+  window.scrollTo(0,0);
+}
+function goBack(){go(prevS==='list'?'list':prevS==='settings'?'settings':'home');}
+
+// Onboarding
+function startApp(){
+  const n=document.getElementById('ob-name').value.trim();
+  if(!n){toast('이름을 입력해주세요!');return;}
+  userName=n;save();
+  showScreen('home');renderHome();
+}
+
+// Init
+(function init(){
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+  setTimeout(()=>{
+    if(userName){showScreen('home');renderHome();}
+    else{showScreen('ob');}
+  }, 1500);
+})();
+
+// Home
+function renderHome(){
+  const expiring=foods.filter(f=>{const d=daysLeft(f.date);return d>=0&&d<=7;}).sort((a,b)=>daysLeft(a.date)-daysLeft(b.date));
+  const expired=foods.filter(f=>daysLeft(f.date)<0);
+  const favs=foods.filter(f=>f.fav);
+  const quote=QUOTES[new Date().getDay()%QUOTES.length];
+  let h=`<div class="hero">
+    <div class="hero-name">${userName}님, 반가워요! 👋</div>
+    <div class="hero-q">${quote}</div>
+    <div class="hero-stats">
+      <div class="hstat"><div class="hstat-n">${foods.length}</div><div class="hstat-l">전체 식품</div></div>
+      <div class="hstat"><div class="hstat-n" style="color:${expired.length?'#F09595':'#9FE1CB'}">${expired.length}</div><div class="hstat-l" style="color:${expired.length?'#F09595':'#9FE1CB'}">기한 초과</div></div>
+    </div>
+  </div>`;
+  if(favs.length){
+    h+=`<div class="sec-row"><span class="sec-lbl">즐겨찾기</span></div>
+    <div class="fav-scroll">`;
+    favs.forEach(f=>{
+      const d=daysLeft(f.date);
+      h+=`<div class="fav-chip"><div class="fav-chip-icon">${f.icon}</div><div class="fav-chip-name">${f.name}</div><span class="${chipCls(d)}" style="font-size:10px;padding:1px 7px">${dayLabel(d)}</span></div>`;
+    });
+    h+=`</div>`;
+  }
+  if(expiring.length){
+    h+=`<div class="sec-row"><span class="sec-lbl">곧 만료돼요 (7일 이내)</span></div>`;
+    expiring.forEach(f=>{
+      const d=daysLeft(f.date),cat=catBy(f.catId);
+      h+=`<div class="food-row ${cardBorder(d)}">
+        <div class="cicon" style="width:44px;height:44px;background:${cat.color}">${f.icon}</div>
+        <div class="food-info">
+          <div class="food-name">${f.name}</div>
+          <div class="food-meta"><span class="chip chip-cat">${cat.icon} ${cat.name}</span><span class="${chipCls(d)}">${dayLabel(d)}</span></div>
+        </div>
+      </div>`;
+    });
+  } else if(!expired.length){
+    h+=`<div class="card" style="text-align:center;padding:24px"><div style="font-size:36px;margin-bottom:8px">😊</div><div style="font-size:14px;color:var(--txt3)">모든 식품이 신선해요!</div></div>`;
+  }
+  h+=`<div class="sec-row" style="margin-top:4px"><span class="sec-lbl">카테고리</span>
+    <div class="sec-acts">
+      <button class="sm-btn" onclick="openCatSheet(null)">+ 추가</button>
+      <button class="sm-btn" onclick="go('settings')">수정</button>
+    </div>
+  </div><div class="cat-grid">`;
+  cats.forEach(c=>{
+    const cnt=foods.filter(f=>f.catId===c.id).length;
+    h+=`<div class="cat-tile">
+      <div class="cicon" style="width:38px;height:38px;background:${c.color};border-radius:10px;font-size:20px">${c.icon}</div>
+      <div><div style="font-size:13px;font-weight:600;color:var(--txt1)">${c.name}</div><div style="font-size:11px;color:var(--txt3)">${cnt}개</div></div>
+    </div>`;
+  });
+  h+=`</div>`;
+  document.getElementById('home-body').innerHTML=h;
+}
+
+// List
+function renderList(){
+  const q=(document.getElementById('srch-inp').value||'').toLowerCase();
+  const sorted=[...foods].filter(f=>!q||f.name.toLowerCase().includes(q)).sort((a,b)=>new Date(a.date)-new Date(b.date));
+  let h='';
+  if(!sorted.length){
+    h=`<div class="empty"><div class="empty-icon">🔍</div><div class="empty-txt">${q?`'${q}' 검색 결과가 없어요`:'등록된 식품이 없어요'}</div></div>`;
+  } else {
+    sorted.forEach(f=>{
+      const d=daysLeft(f.date),cat=catBy(f.catId);
+      h+=`<div class="food-row ${cardBorder(d)}">
+        <div class="cicon" style="width:44px;height:44px;background:${cat.color}">${f.icon}</div>
+        <div class="food-info">
+          <div class="food-name">${f.name}</div>
+          <div class="food-meta"><span class="chip chip-cat">${cat.icon} ${cat.name}</span><span class="${chipCls(d)}">${f.date.slice(5).replace('-','.')} · ${dayLabel(d)}</span></div>
+          ${f.memo?`<div class="food-memo">${f.memo}</div>`:''}
+        </div>
+        ${f.qty?`<span style="font-size:13px;font-weight:500;color:var(--txt2);flex-shrink:0">${f.qty}개</span>`:''}
+        <button class="row-btn ${f.fav?'fav-on':''}" onclick="toggleFav('${f.id}')" aria-label="즐겨찾기">⭐</button>
+        <button class="row-btn del" onclick="doDelFood('${f.id}')" aria-label="삭제">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
+      </div>`;
+    });
+  }
+  document.getElementById('list-body').innerHTML=h;
+}
+
+function toggleFav(id){
+  const f=foods.find(x=>x.id===id);if(!f)return;
+  f.fav=!f.fav;save();renderList();
+}
+async function doDelFood(id){
+  const f=foods.find(x=>x.id===id);if(!f)return;
+  const ok=await confirm('식품 삭제',`'${f.name}'을(를) 삭제할까요?`);
+  if(ok){foods=foods.filter(x=>x.id!==id);save();renderList();toast('삭제됐어요');}
+}
+
+// Buy
+function renderBuy(){
+  const done=buyItems.filter(b=>b.done).length;
+  const btn=document.getElementById('clear-done-btn');
+  if(btn) btn.style.display=done?'block':'none';
+  const pct=buyItems.length?Math.round(done/buyItems.length*100):0;
+  let h=`<div class="card" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <div><div style="font-size:15px;font-weight:600;color:var(--txt1)">구매 목록</div>
+    <div style="font-size:12px;color:var(--txt2);margin-top:2px">${done}/${buyItems.length}개 완료</div></div>
+    ${buyItems.length?`<div class="prog-ring"><svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="none" stroke="#E5E7EB" stroke-width="4"/><circle cx="22" cy="22" r="18" fill="none" stroke="#1D9E75" stroke-width="4" stroke-dasharray="${2*Math.PI*18}" stroke-dashoffset="${2*Math.PI*18*(1-pct/100)}" stroke-linecap="round"/></svg><div class="prog-ring-lbl">${pct}%</div></div>`:''}
+  </div>`;
+  if(!buyItems.length){
+    h+=`<div class="empty"><div class="empty-icon">🛒</div><div class="empty-txt">구매할 항목을 추가해보세요!</div></div>`;
+  } else {
+    buyItems.forEach(b=>{
+      h+=`<div class="buy-row">
+        <div class="buy-check ${b.done?'on':''}" onclick="toggleBuy('${b.id}')">${b.done?'✓':''}</div>
+        <span class="buy-name ${b.done?'done':''}">${b.name}</span>
+        <button class="row-btn del" onclick="delBuy('${b.id}')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+        </button>
+      </div>`;
+    });
+  }
+  document.getElementById('buy-body').innerHTML=h;
+}
+function toggleBuy(id){const b=buyItems.find(x=>x.id===id);if(b){b.done=!b.done;save();renderBuy();}}
+function delBuy(id){buyItems=buyItems.filter(x=>x.id!==id);save();renderBuy();}
+function clearDone(){buyItems=buyItems.filter(b=>!b.done);save();renderBuy();}
+function addBuy(){
+  const inp=document.getElementById('buy-inp');
+  const name=inp.value.trim();if(!name)return;
+  buyItems.push({id:uid(),name,done:false});
+  save();inp.value='';renderBuy();
+}
+
+// Add Food
+function initAdd(){
+  selFoodE='📦';isFavCheck=false;
+  ['f-name','f-memo','f-qty'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-date').value='';
+  document.getElementById('f-date-lbl').textContent='날짜를 선택하세요';
+  document.getElementById('f-date-btn').className='date-btn empty';
+  document.getElementById('fav-check-box').className='fav-check-box';
+  const sel=document.getElementById('f-cat');
+  sel.innerHTML=cats.map(c=>`<option value="${c.id}">${c.icon}  ${c.name}</option>`).join('');
+  document.getElementById('food-ep').innerHTML=FOOD_E.map(e=>`<button class="ep-btn${e===selFoodE?' sel':''}" onclick="pickFoodE('${e}')">${e}</button>`).join('');
+}
+function pickFoodE(e){selFoodE=e;document.querySelectorAll('#food-ep .ep-btn').forEach(b=>b.classList.toggle('sel',b.textContent===e));}
+function toggleFavCheck(){
+  isFavCheck=!isFavCheck;
+  document.getElementById('fav-check-box').className='fav-check-box'+(isFavCheck?' on':'');
+  document.getElementById('fav-check-box').textContent=isFavCheck?'✓':'';
+}
+function openDatePicker(){document.getElementById('f-date').showPicker?document.getElementById('f-date').showPicker():document.getElementById('f-date').click();}
+function onDateChange(){
+  const v=document.getElementById('f-date').value;
+  if(v){
+    document.getElementById('f-date-lbl').textContent=v.replace(/-/g,'.');
+    document.getElementById('f-date-btn').className='date-btn';
+  }
+}
+function saveFood(){
+  const name=document.getElementById('f-name').value.trim();
+  const catId=document.getElementById('f-cat').value;
+  const date=document.getElementById('f-date').value;
+  if(!name){toast('식품명을 입력해주세요');return;}
+  if(!catId){toast('카테고리를 선택해주세요');return;}
+  if(!date){toast('유통기한을 선택해주세요');return;}
+  const qty=parseInt(document.getElementById('f-qty').value)||0;
+  const memo=document.getElementById('f-memo').value.trim();
+  foods.push({id:uid(),name,icon:selFoodE,catId,date,qty,memo,fav:isFavCheck});
+  save();toast('저장됐어요! 🎉');go('list');
+}
+
+// Settings
+function renderSettings(){
+  document.getElementById('set-name-v').textContent=userName;
+  document.getElementById('info-food-cnt').textContent=foods.length+'개';
+  document.getElementById('info-cat-cnt').textContent=cats.length+'개';
+  let h='';
+  cats.forEach((c,i)=>{
+    h+=`<div class="cat-row" ${i?'style="border-top:0.5px solid var(--border)"':''}>
+      <div class="cat-row-icon" style="background:${c.color}">${c.icon}</div>
+      <span style="flex:1;font-size:14px;color:var(--txt1)">${c.name}</span>
+      <button class="row-btn" onclick="openCatSheet('${c.id}')" aria-label="수정" style="margin-right:4px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+      <button class="row-btn del" onclick="doDelCat('${c.id}')" aria-label="삭제">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+      </button>
+    </div>`;
+  });
+  document.getElementById('cat-list').innerHTML=h;
+}
+function changeName(){
+  const n=document.getElementById('set-name-inp').value.trim();
+  if(!n){toast('이름을 입력해주세요');return;}
+  userName=n;save();
+  document.getElementById('set-name-v').textContent=userName;
+  document.getElementById('set-name-inp').value='';
+  toast(`이름이 '${userName}'으로 변경됐어요!`);
+}
+
+// Category sheet
+function openCatSheet(id){
+  editCatId=id;
+  const c=id?cats.find(x=>x.id===id):null;
+  selCatE=c?c.icon:'📦';
+  document.getElementById('cat-sheet-title').textContent=c?'카테고리 수정':'카테고리 추가';
+  document.getElementById('cs-save-btn').textContent=c?'저장':'추가';
+  document.getElementById('cs-name').value=c?c.name:'';
+  document.getElementById('cat-ep').innerHTML=CAT_E.map(e=>`<button class="ep-btn${e===selCatE?' sel':''}" onclick="pickCatE('${e}')">${e}</button>`).join('');
+  document.getElementById('cat-sheet').classList.add('open');
+}
+function closeCatSheet(){document.getElementById('cat-sheet').classList.remove('open');}
+function pickCatE(e){selCatE=e;document.querySelectorAll('#cat-ep .ep-btn').forEach(b=>b.classList.toggle('sel',b.textContent===e));}
+function saveCat(){
+  const name=document.getElementById('cs-name').value.trim();
+  if(!name){toast('카테고리 이름을 입력해주세요');return;}
+  if(editCatId){
+    const c=cats.find(x=>x.id===editCatId);
+    if(c){c.name=name;c.icon=selCatE;}
+  } else {
+    cats.push({id:uid(),name,icon:selCatE,color:CAT_COLORS[cats.length%CAT_COLORS.length]});
+  }
+  save();closeCatSheet();
+  if(prevS==='settings') renderSettings(); else renderHome();
+  toast(editCatId?'수정됐어요':'카테고리가 추가됐어요');
+}
+async function doDelCat(id){
+  const c=cats.find(x=>x.id===id);if(!c)return;
+  if(foods.some(f=>f.catId===id)){toast(`'${c.name}'에 식품이 있어서 삭제할 수 없어요`);return;}
+  const ok=await confirm('카테고리 삭제',`'${c.name}' 카테고리를 삭제할까요?`);
+  if(ok){cats=cats.filter(x=>x.id!==id);save();renderSettings();toast('삭제됐어요');}
+}
+
+// Close sheet on backdrop tap
+document.getElementById('cat-sheet').addEventListener('click',function(e){
+  if(e.target===this) closeCatSheet();
+});
+</script>
+</body>
+</html>
