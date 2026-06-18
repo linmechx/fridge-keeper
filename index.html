@@ -375,7 +375,9 @@ function save(){S.set('fk_foods',foods);S.set('fk_cats',cats);S.set('fk_buy',buy
 
 // ===== 가족 공유 (Firebase) =====
 let familyCode=S.get('fk_family')||'';
-let familyMembers=[];
+let familyMembers={};
+// 기기 고유 ID (처음 한번 생성 후 유지)
+let deviceId=S.get('fk_deviceid')||(()=>{const id='dev_'+Math.random().toString(36).slice(2,10);S.set('fk_deviceid',id);return id;})();
 let isSyncing=false;
 let unsubscribe=null;
 
@@ -385,13 +387,9 @@ async function syncToCloud(){
   isSyncing=true;
   try{
     const {doc,setDoc,getDoc}=window._fbFns;
-    // 기존 members 가져와서 현재 유저 추가
-    let members=[];
-    try{
-      const snap=await getDoc(doc(window._fbDb,'families',familyCode));
-      if(snap.exists()) members=snap.data().members||[];
-    }catch(e){}
-    if(userName&&!members.includes(userName)) members.push(userName);
+    // members 객체에 현재 기기 등록
+    let members=familyMembers||{};
+    if(userName) members[deviceId]=userName;
     await setDoc(doc(window._fbDb,'families',familyCode),{
       foods,cats,buyItems,sharedMemo,members,updatedAt:Date.now()
     });
@@ -410,7 +408,7 @@ async function loadFromCloud(){
       cats=d.cats||cats;
       buyItems=d.buyItems||[];
       sharedMemo=d.sharedMemo||'';
-      familyMembers=d.members||[];
+      familyMembers=d.members||{};
       S.set('fk_foods',foods);S.set('fk_cats',cats);S.set('fk_buy',buyItems);S.set('fk_memo',sharedMemo);
       return true;
     }
@@ -429,7 +427,7 @@ function startRealtimeSync(){
       cats=d.cats||cats;
       buyItems=d.buyItems||[];
       sharedMemo=d.sharedMemo||'';
-      familyMembers=d.members||[];
+      familyMembers=d.members||{};
       S.set('fk_foods',foods);S.set('fk_cats',cats);S.set('fk_buy',buyItems);S.set('fk_memo',sharedMemo);
       // 현재 화면 새로고침
       const cur=screenStack[screenStack.length-1]||'home';
@@ -448,8 +446,8 @@ async function joinFamily(code){
   familyCode=code;
   S.set('fk_family',familyCode);
   const loaded=await loadFromCloud();
-  // 본인 이름 members에 추가
-  if(userName&&!familyMembers.includes(userName)) familyMembers.push(userName);
+  // 본인 기기 이름 등록
+  if(userName) familyMembers[deviceId]=userName;
   await syncToCloud();
   startRealtimeSync();
   renderHome();renderSettings();
@@ -459,11 +457,10 @@ async function joinFamily(code){
 async function leaveFamily(){
   if(unsubscribe){unsubscribe();unsubscribe=null;}
   // members에서 본인 제거
-  if(userName&&familyMembers.includes(userName)){
-    familyMembers=familyMembers.filter(m=>m!==userName);
-    await syncToCloud();
-  }
-  familyCode='';familyMembers=[];
+  // 본인 기기 제거
+  delete familyMembers[deviceId];
+  await syncToCloud();
+  familyCode='';familyMembers={};
   S.set('fk_family','');
   renderSettings();toast('가족 공유가 해제됐어요');
 }
@@ -536,9 +533,9 @@ function startApp(){
           await new Promise(r=>window.addEventListener('fbReady',r,{once:true}));
         }
         await loadFromCloud();
-        // 본인 이름 members에 추가
-        if(userName&&!familyMembers.includes(userName)){
-          familyMembers.push(userName);
+        // 본인 기기 이름 등록/업데이트
+        if(userName){
+          familyMembers[deviceId]=userName;
           await syncToCloud();
         }
         startRealtimeSync();
@@ -710,7 +707,8 @@ function renderSettings(){
   const fs=document.getElementById('family-section');
   if(fs){
     if(familyCode){
-      const memberHtml=familyMembers.length?familyMembers.map(m=>`<span style="display:inline-block;background:#E1F5EE;color:var(--primary);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:500;margin:2px">${m}</span>`).join(''):'<span style="font-size:13px;color:var(--txt3)">아직 없어요</span>';
+      const memberList=Object.values(familyMembers||{});
+      const memberHtml=memberList.length?memberList.map(m=>`<span style="display:inline-block;background:#E1F5EE;color:var(--primary);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:500;margin:2px">${m===userName?m+' (나)':m}</span>`).join(''):'<span style="font-size:13px;color:var(--txt3)">아직 없어요</span>';
       fs.innerHTML=`<div class="set-row"><span class="set-lbl">공유 코드</span><span class="set-val" style="color:var(--primary);font-weight:600">${familyCode}</span></div>
       <div style="padding:8px 16px;border-top:0.5px solid var(--border)"><div style="font-size:12px;color:var(--txt2);margin-bottom:8px;font-weight:600">구성원</div><div style="display:flex;flex-wrap:wrap;gap:4px">${memberHtml}</div></div>
       <div style="padding:12px 16px 14px;display:flex;gap:8px;border-top:0.5px solid var(--border)">
@@ -749,13 +747,9 @@ async function changeName(){
   const oldName=userName;
   userName=n;
   S.set('fk_user',userName);
-  // members에서 이전 이름 → 새 이름으로 교체
+  // members에서 본인 기기 이름 업데이트
   if(familyCode){
-    if(oldName&&familyMembers.includes(oldName)){
-      familyMembers=familyMembers.map(m=>m===oldName?n:m);
-    } else if(!familyMembers.includes(n)){
-      familyMembers.push(n);
-    }
+    familyMembers[deviceId]=n;
     await syncToCloud();
   }
   save();
