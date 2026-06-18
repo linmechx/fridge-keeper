@@ -373,6 +373,7 @@ function save(){S.set('fk_foods',foods);S.set('fk_cats',cats);S.set('fk_buy',buy
 
 // ===== 가족 공유 (Firebase) =====
 let familyCode=S.get('fk_family')||'';
+let familyMembers=[];
 let isSyncing=false;
 let unsubscribe=null;
 
@@ -381,9 +382,16 @@ async function syncToCloud(){
   if(!window._fbDb)return;
   isSyncing=true;
   try{
-    const {doc,setDoc}=window._fbFns;
+    const {doc,setDoc,getDoc}=window._fbFns;
+    // 기존 members 가져와서 현재 유저 추가
+    let members=[];
+    try{
+      const snap=await getDoc(doc(window._fbDb,'families',familyCode));
+      if(snap.exists()) members=snap.data().members||[];
+    }catch(e){}
+    if(userName&&!members.includes(userName)) members.push(userName);
     await setDoc(doc(window._fbDb,'families',familyCode),{
-      foods,cats,buyItems,sharedMemo,updatedAt:Date.now()
+      foods,cats,buyItems,sharedMemo,members,updatedAt:Date.now()
     });
   }catch(e){console.log('sync error',e);}
   isSyncing=false;
@@ -400,6 +408,7 @@ async function loadFromCloud(){
       cats=d.cats||cats;
       buyItems=d.buyItems||[];
       sharedMemo=d.sharedMemo||'';
+      familyMembers=d.members||[];
       S.set('fk_foods',foods);S.set('fk_cats',cats);S.set('fk_buy',buyItems);S.set('fk_memo',sharedMemo);
       return true;
     }
@@ -418,6 +427,7 @@ function startRealtimeSync(){
       cats=d.cats||cats;
       buyItems=d.buyItems||[];
       sharedMemo=d.sharedMemo||'';
+      familyMembers=d.members||[];
       S.set('fk_foods',foods);S.set('fk_cats',cats);S.set('fk_buy',buyItems);S.set('fk_memo',sharedMemo);
       // 현재 화면 새로고침
       const cur=screenStack[screenStack.length-1]||'home';
@@ -682,9 +692,11 @@ function renderSettings(){
   const fs=document.getElementById('family-section');
   if(fs){
     if(familyCode){
+      const memberHtml=familyMembers.length?familyMembers.map(m=>`<span style="display:inline-block;background:#E1F5EE;color:var(--primary);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:500;margin:2px">${m}</span>`).join(''):'<span style="font-size:13px;color:var(--txt3)">아직 없어요</span>';
       fs.innerHTML=`<div class="set-row"><span class="set-lbl">공유 코드</span><span class="set-val" style="color:var(--primary);font-weight:600">${familyCode}</span></div>
-      <div style="padding:0 16px 14px;display:flex;gap:8px">
-        <button onclick="loadFromCloud().then(()=>{renderHome();toast('새로고침됐어요!');})" style="flex:1;padding:11px;border-radius:10px;background:#E1F5EE;color:var(--primary);border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">새로고침</button>
+      <div style="padding:8px 16px;border-top:0.5px solid var(--border)"><div style="font-size:12px;color:var(--txt2);margin-bottom:8px;font-weight:600">구성원</div><div style="display:flex;flex-wrap:wrap;gap:4px">${memberHtml}</div></div>
+      <div style="padding:12px 16px 14px;display:flex;gap:8px;border-top:0.5px solid var(--border)">
+        <button onclick="loadFromCloud().then(()=>{renderHome();renderSettings();toast('새로고침됐어요!');})" style="flex:1;padding:11px;border-radius:10px;background:#E1F5EE;color:var(--primary);border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">새로고침</button>
         <button onclick="leaveFamily()" style="flex:1;padding:11px;border-radius:10px;background:#FCEBEB;color:#A32D2D;border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">공유 해제</button>
       </div>`;
     } else {
