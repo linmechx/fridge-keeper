@@ -439,8 +439,10 @@ function closeDialog(ok){
 
 // Navigation
 function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active');});
-  document.getElementById('s-'+id).classList.add('active');
+  document.querySelectorAll('.screen').forEach(s=>{s.classList.remove('active');s.style.display='none';});
+  const t=document.getElementById('s-'+id);
+  t.style.display='flex';
+  t.classList.add('active');
 }
 function go(s){
   if(!['add','catsheet'].includes(s)) prevS=s;
