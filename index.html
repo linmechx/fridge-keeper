@@ -141,6 +141,25 @@ html,body{height:100%;overflow:hidden;background:var(--bg);font-family:-apple-sy
 .empty-txt{font-size:15px}
 input[type=date]{-webkit-appearance:none;appearance:none}
 </style>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA5zqcTTVAzE42IEPUHrtR1ZYipqVl_2RI",
+  authDomain: "fridge-keeper-99807.firebaseapp.com",
+  projectId: "fridge-keeper-99807",
+  storageBucket: "fridge-keeper-99807.firebasestorage.app",
+  messagingSenderId: "635052061605",
+  appId: "1:635052061605:web:f296c0d658c3f5eccb2e4c"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window._fbDb = db;
+window._fbFns = { doc, setDoc, getDoc, onSnapshot };
+</script>
 </head>
 <body>
 <div id="app">
@@ -352,43 +371,35 @@ userName=S.get('fk_user')||'';
 
 function save(){S.set('fk_foods',foods);S.set('fk_cats',cats);S.set('fk_buy',buyItems);S.set('fk_user',userName);S.set('fk_order',customOrder);if(familyCode)syncToCloud();}
 
-// ===== 가족 공유 (JSONBin) =====
-const JBIN_KEY='$2a$10$AGBd4L.yFiO72ev7S9.DHOPFl9BRRVjPnjS6IC7psmDVRcjmyQy9q';
+// ===== 가족 공유 (Firebase) =====
 let familyCode=S.get('fk_family')||'';
-let binId=S.get('fk_binid')||'';
 let isSyncing=false;
+let unsubscribe=null;
 
 async function syncToCloud(){
   if(!familyCode||isSyncing)return;
+  if(!window._fbDb)return;
   isSyncing=true;
-  const data={foods,cats,buyItems,sharedMemo:sharedMemo,familyCode};
   try{
-    if(binId){
-      await fetch(`https://api.jsonbin.io/v3/b/${binId}`,{method:'PUT',headers:{'Content-Type':'application/json','X-Access-Key':JBIN_KEY},body:JSON.stringify(data)});
-    } else {
-      const r=await fetch('https://api.jsonbin.io/v3/b',{method:'POST',headers:{'Content-Type':'application/json','X-Access-Key':JBIN_KEY,'X-Bin-Name':familyCode},body:JSON.stringify(data)});
-      const j=await r.json();
-      binId=j.metadata.id;S.set('fk_binid',binId);
-    }
+    const {doc,setDoc}=window._fbFns;
+    await setDoc(doc(window._fbDb,'families',familyCode),{
+      foods,cats,buyItems,sharedMemo,updatedAt:Date.now()
+    });
   }catch(e){console.log('sync error',e);}
   isSyncing=false;
 }
 
 async function loadFromCloud(){
-  if(!familyCode)return false;
+  if(!familyCode||!window._fbDb)return false;
   try{
-    // search by name
-    if(!binId){
-      const r=await fetch(`https://api.jsonbin.io/v3/b?q=${familyCode}`,{headers:{'X-Access-Key':JBIN_KEY}});
-      // jsonbin doesn't support search by name directly, use binId stored locally
-      return false;
-    }
-    const r=await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`,{headers:{'X-Access-Key':JBIN_KEY}});
-    if(!r.ok)return false;
-    const j=await r.json();
-    const d=j.record;
-    if(d.familyCode===familyCode){
-      foods=d.foods||[];cats=d.cats||cats;buyItems=d.buyItems||[];sharedMemo=d.sharedMemo||'';
+    const {doc,getDoc}=window._fbFns;
+    const snap=await getDoc(doc(window._fbDb,'families',familyCode));
+    if(snap.exists()){
+      const d=snap.data();
+      foods=d.foods||[];
+      cats=d.cats||cats;
+      buyItems=d.buyItems||[];
+      sharedMemo=d.sharedMemo||'';
       S.set('fk_foods',foods);S.set('fk_cats',cats);S.set('fk_buy',buyItems);S.set('fk_memo',sharedMemo);
       return true;
     }
@@ -396,20 +407,45 @@ async function loadFromCloud(){
   return false;
 }
 
+function startRealtimeSync(){
+  if(!familyCode||!window._fbDb)return;
+  if(unsubscribe)unsubscribe();
+  const {doc,onSnapshot}=window._fbFns;
+  unsubscribe=onSnapshot(doc(window._fbDb,'families',familyCode),(snap)=>{
+    if(snap.exists()&&!isSyncing){
+      const d=snap.data();
+      foods=d.foods||[];
+      cats=d.cats||cats;
+      buyItems=d.buyItems||[];
+      sharedMemo=d.sharedMemo||'';
+      S.set('fk_foods',foods);S.set('fk_cats',cats);S.set('fk_buy',buyItems);S.set('fk_memo',sharedMemo);
+      // 현재 화면 새로고침
+      const cur=screenStack[screenStack.length-1]||'home';
+      if(cur==='home')renderHome();
+      else if(cur==='list')renderList();
+      else if(cur==='buy')renderBuy();
+      // 메모 업데이트
+      const memoEl=document.getElementById('shared-memo-input');
+      if(memoEl&&document.activeElement!==memoEl)memoEl.value=sharedMemo;
+    }
+  });
+}
+
 async function joinFamily(code){
   if(!code)return;
-  familyCode=code;binId='';
-  S.set('fk_family',familyCode);S.set('fk_binid','');
-  // try to find existing bin
+  familyCode=code;
+  S.set('fk_family',familyCode);
   const loaded=await loadFromCloud();
-  if(!loaded)await syncToCloud(); // create new
+  if(!loaded)await syncToCloud();
+  startRealtimeSync();
   renderHome();renderSettings();
   toast(loaded?`가족 공유 연결됐어요! (${code})`:`새 가족 공유 코드 '${code}' 생성됐어요!`);
 }
 
 function leaveFamily(){
-  familyCode='';binId='';
-  S.set('fk_family','');S.set('fk_binid','');
+  if(unsubscribe){unsubscribe();unsubscribe=null;}
+  familyCode='';
+  S.set('fk_family','');
   renderSettings();toast('가족 공유가 해제됐어요');
 }
 
@@ -474,7 +510,12 @@ function startApp(){
   document.body.appendChild(splash);
 
   setTimeout(async()=>{
-    if(familyCode&&binId){try{await loadFromCloud();}catch(e){}}
+    if(familyCode){
+      try{
+        await loadFromCloud();
+        setTimeout(()=>startRealtimeSync(),100);
+      }catch(e){}
+    }
     // 스플래시 제거
     splash.remove();
     // 다음 화면으로
@@ -643,7 +684,7 @@ function renderSettings(){
     if(familyCode){
       fs.innerHTML=`<div class="set-row"><span class="set-lbl">공유 코드</span><span class="set-val" style="color:var(--primary);font-weight:600">${familyCode}</span></div>
       <div style="padding:0 16px 14px;display:flex;gap:8px">
-        <button onclick="if(familyCode){loadFromCloud().then(()=>{renderHome();toast('새로고침됐어요!');})}" style="flex:1;padding:11px;border-radius:10px;background:#E1F5EE;color:var(--primary);border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">새로고침</button>
+        <button onclick="loadFromCloud().then(()=>{renderHome();toast('새로고침됐어요!');})" style="flex:1;padding:11px;border-radius:10px;background:#E1F5EE;color:var(--primary);border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">새로고침</button>
         <button onclick="leaveFamily()" style="flex:1;padding:11px;border-radius:10px;background:#FCEBEB;color:#A32D2D;border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">공유 해제</button>
       </div>`;
     } else {
